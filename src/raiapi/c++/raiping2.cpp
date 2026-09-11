@@ -368,8 +368,8 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
       this->msgRecvd++;
 
       if ( this->printTimer == NULL ) {
-        rai::Sys::out->printf( "%s cnt=%qu latency=%.3f\n",
-                          event.subject, this->msgRecvd, latencyMS );
+        rai::Sys::out->printf( "%s cnt=%u latency=%.3f\n",
+                      event.subject, (unsigned int) this->msgRecvd, latencyMS );
         rai::Sys::out->flush();
       }
       if ( this->msgRecvd == this->msgCount )
