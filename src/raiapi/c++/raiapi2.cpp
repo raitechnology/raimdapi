@@ -312,11 +312,18 @@ RaiPublish::Publish( const char *subject,  RaiMsg* raiMsg,  TimeNSecs stamp )
   delete raiMsg;
 }
 
+static const char * prefix_null_check( const char *value ) {
+  if ( value != NULL &&
+       ( value[ 0 ] == '\0' || ::strcmp( value, "\"\"" ) == 0  ||
+         ::strcmp( value, "-" ) == 0 ) )
+    value = NULL;
+  return value;
+}
+
 void
 RaiPublish::SetPrefix( const char *prefix )
 {
-  if ( prefix != NULL && prefix[ 0 ] == '\0' )
-    prefix = NULL;
+  prefix = prefix_null_check( prefix );
 
   STRDUP( this->prefix, prefix );
   if ( prefix != NULL )

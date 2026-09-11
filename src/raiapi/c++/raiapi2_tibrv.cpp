@@ -337,7 +337,7 @@ struct RaiInteractivePublish_tibrv : public RaiInteractivePublish,
 
 
 RAI_DLL_EXPORT RaiApi *
-RaiApi_RaiOpen_tibrv( int /* argc */,  char */* argv */[] )
+RaiApi_RaiOpen_tibrv( int /* argc */,  char * /* argv */[] )
 {
   tibrv_status status = tibrv_Open();
   if ( status != TIBRV_OK ) {
@@ -365,6 +365,14 @@ static const char network_arg[]     = "network",
                   service_arg[]     = "service",
                   daemon_arg[]      = "daemon",
                   snap_prefix_arg[] = "snapPrefix";
+static const char * prefix_null_check( const char *value ) {
+  if ( value != NULL &&
+       ( value[ 0 ] == '\0' || ::strcmp( value, "\"\"" ) == 0  ||
+         ::strcmp( value, "-" ) == 0 ) )
+    value = NULL;
+  return value;
+}
+
 void
 RaiApi_tibrv::GetArgs( Args &args )
 {
@@ -400,7 +408,7 @@ RaiApi_tibrv::ParseArgs( Args &args )
   s = args.getString( daemon_arg );
   if ( s != NULL )
     STRDUP( this->daemon, s );
-  s = args.getString( snap_prefix_arg );
+  s = prefix_null_check( args.getString( snap_prefix_arg ) );
   if ( s != NULL )
     STRDUP( this->snapPrefix, s );
 }
@@ -423,8 +431,9 @@ RaiApi_tibrv::SetIoctl( const char *parameter,
     STRDUP( this->service, (const char *) value );
   else if ( ::strcmp( parameter, network_arg ) == 0 )
     STRDUP( this->network, (const char *) value );
-  else if ( ::strcmp( parameter, snap_prefix_arg ) == 0 )
-    STRDUP( this->snapPrefix, (const char *) value );
+  else if ( ::strcmp( parameter, snap_prefix_arg ) == 0 ) {
+    STRDUP( this->snapPrefix, prefix_null_check( (const char *) value ) );
+  }
   else
     return this->RaiApi::SetIoctl( parameter, value );
   return true;
@@ -564,11 +573,20 @@ RaiSession_tibrv::Start( void )
 
   status = tibrvTransport_Create( &this->rvT, this->api.service,
                                   this->api.network, this->api.daemon );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchMode( this->rvT, TIBRV_TRANSPORT_SINGLE_BATCH );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchSize( this->rvT, 16384 );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchInterval( this->rvT, 0.1 );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchDispatchFlush( this->rvT, TIBRV_TRUE );
   if ( status != TIBRV_OK ) {
     RaiException e = RaiApi_tibrv::getRvErr( status );
     logError( LERROR, e, "Error in tibrvTransport_Create()" );
     throw e;
   }
+
   status = tibrvEvent_CreateListener( &this->warn, this->xQ,
                                       RaiSession_tibrv::rvSys_onMsg,
                                       this->rvT, RV_WARN_SUBJECT, this );
@@ -866,7 +884,7 @@ RaiQueue_tibrv::GetDepth( void )
 
 
 RaiEntitlement *
-RaiSession_tibrv::Login( const char */* user */ )
+RaiSession_tibrv::Login( const char * /* user */ )
 {
   return NULL;
 }
@@ -1689,7 +1707,7 @@ static const char rv_info_sys_listen_start[] = "_RV.INFO.SYSTEM.LISTEN.START.",
                   rv_snap[] = "_SNAP.";
 
 void
-RaiInteractivePublish_tibrv::onMsg( RaiMsgEvent &event,  RaiMsg &msg,  void */* cl */ )
+RaiInteractivePublish_tibrv::onMsg( RaiMsgEvent &event,  RaiMsg &msg,  void * /* cl */ )
 {
   unsigned int off, flags;
   const char *reply;

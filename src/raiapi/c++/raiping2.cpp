@@ -39,7 +39,7 @@ struct RaiPing2Args {
     prefix_arg(  "prefix", NULL, "<subject>",
         "Subject to prefix publish subject with, usually set to "
         "_TIC. if using SASS/RV" ),
-    subject_arg(  "subject", "PING.${HOSTNAME}", "<subject>", 
+    subject_arg(  "subject", "PING.REC.TEST.NaE", "<subject>", 
          "Subject to ping" ),
     direct_arg(   "direct", false, "<bool>", 
          "Whether to dispatch messages directly from the recv "
@@ -189,7 +189,13 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
     if ( this->api != NULL )
       this->api->Close();
   }
-
+  static const char * prefix_null_check( const char *value ) {
+    if ( value != NULL &&
+         ( value[ 0 ] == '\0' || ::strcmp( value, "\"\"" ) == 0  ||
+           ::strcmp( value, "-" ) == 0 ) )
+      value = NULL;
+    return value;
+  }
   bool init( RaiApi *apip,  rai::Args &args ) {
     this->api = apip;
     try {
@@ -205,7 +211,7 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
       this->api->ParseArgs( args );
 
       STRDUP( this->subject, args.getString( pargs.subject_arg.name ) );
-      STRDUP( this->prefix, args.getString( pargs.prefix_arg.name ) );
+      STRDUP( this->prefix, prefix_null_check( args.getString( pargs.prefix_arg.name ) ) );
       this->msgCount      = args.getULLong( pargs.msgCount_arg.name );
       this->msgsPerSec    = args.getDouble( pargs.perSec_arg.name );
       this->direct        = args.getBoolean( pargs.direct_arg.name );
@@ -292,10 +298,10 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
   }
 
   /* RaiDataLossCallback */
-  virtual void onConnection( RaiConnectionEvent &event,  void */* cl */ ) {
+  virtual void onConnection( RaiConnectionEvent &event,  void * /* cl */ ) {
     this->api->PrintLog( LMINOR, "%s", event.description );
   }
-  virtual void onDataLoss( RaiDataLossEvent &event,  void */* cl */ ) {
+  virtual void onDataLoss( RaiDataLossEvent &event,  void * /* cl */ ) {
     RaiException e = RaiApiErr::getErr( RaiApiErr::TSPT_DATALOSS );
     this->api->PrintLog( LERROR, e, "%s", event.description );
   }
@@ -318,7 +324,7 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
   }
 
   /* RaiMsgCallback */
-  virtual void onMsg( RaiMsgEvent &event,  RaiMsg &raiMsg,  void */* closure */ ) {
+  virtual void onMsg( RaiMsgEvent &event,  RaiMsg &raiMsg,  void * /* closure */ ) {
     double         latencyMS,
                    cpms;
     rai::TimeHires sendTime,
@@ -372,7 +378,7 @@ class RaiPing2 : public RaiTimerCallback, public RaiMsgCallback,
   }
 
   /* RaiTimerCallback */
-  virtual void onTimer( RaiTimer &timer, void */* closure */ ) {
+  virtual void onTimer( RaiTimer &timer, void * /* closure */ ) {
     if ( &timer == this->publishTimer )
       this->publish();
     else if ( &timer == this->printTimer )

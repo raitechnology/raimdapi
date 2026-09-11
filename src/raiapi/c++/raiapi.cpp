@@ -31,7 +31,7 @@ RaiTimerImpl::RaiTimerImpl( RaiTimer * /* timer */, RaiSession * session, RaiTim
   tibrv_status    status;
   void          * cl;
   
-  rv_interval = interval / 1000;
+  rv_interval = (tibrv_f64) interval / 1000.0; /* msecs -> secs, keep fraction */
   cl = this->AddTimer( session, callback, closure );
   status = tibrvEvent_CreateTimer(&this->TimerEvent, session->sessionImpl->rvQ,
                                   RaiTimerImpl::RV_callback, rv_interval, cl );
@@ -114,7 +114,7 @@ void RaiTimer::SetInterval( TimeMSecs interval ){
   tibrv_f64 rv_interval;
   tibrv_status status;
   
-  rv_interval = interval / 1000;
+  rv_interval = (tibrv_f64) interval / 1000.0; /* msecs -> secs, keep fraction */
   status = tibrvEvent_ResetTimerInterval( this->timerImpl->TimerEvent, rv_interval );
   if ( status != TIBRV_OK ) {
     logError( LERROR, badRvStatus( status ), "SetTimerInterval" );
@@ -247,7 +247,7 @@ RaiEntImpl::Load( RaiSession *session, char *loginDetails )
 }
 
 void 
-RaiEntImpl::TCPLoad( RaiSession */* session */, char */* loginDetails */ ) {
+RaiEntImpl::TCPLoad( RaiSession * /* session */, char * /* loginDetails */ ) {
 
 };
 
@@ -592,9 +592,16 @@ RaiSessionImpl::RaiSessionImpl( RaiSession * session, const char *svcname, const
   this->receivedSubject = true;
 
   status = tibrvQueue_Create( &this->rvQ );
-  if ( status != TIBRV_OK )
-    throw badRvStatus( status );
-  status = tibrvTransport_Create( &this->rvT, svcname, netname, dmnname );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_Create( &this->rvT, svcname, netname, dmnname );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchMode( this->rvT, TIBRV_TRANSPORT_SINGLE_BATCH );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchSize( this->rvT, 16384 );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchInterval( this->rvT, 0.1 );
+  if ( status == TIBRV_OK )
+    status = tibrvTransport_SetBatchDispatchFlush( this->rvT, TIBRV_TRUE );
   if ( status != TIBRV_OK )
     throw badRvStatus( status );
 }
@@ -789,7 +796,6 @@ RaiPublish::Publish( RaiMsg * raiMsg )
 void
 RaiPublish::Publish(const char * subject, RaiMsg * raiMsg )
 {
-  char          ticName[256];
   tibrvMsg      m;
   tibrv_status  status;
 
@@ -810,19 +816,24 @@ RaiPublish::Publish(const char * subject, RaiMsg * raiMsg )
   if( ! this->isComplex )
     raiMsg->Update( "SEQ_NO", (Rai_u16) this->seqNo++ );
 
-
+#if 0
+  char ticName[256];
   ::strcpy( ticName, "_TIC." );
   str_copy( &ticName[ 5 ], subject, sizeof( ticName ) - 5 );
-
-  logDebug( LDEBUG, "Publishing to %s, msgSize %u", ticName,
+#endif
+  logDebug( LDEBUG, "Publishing to %s, msgSize %u", subject,
             raiMsg->PackSize() );
       
   // now wrap the message in a RVMsg and send it
-  status = tibrvMsg_Create( &m );
-  if ( status != TIBRV_OK )
-    throw badRvStatus( status );
-  status = tibrvMsg_AddOpaque( m, "_data_", (void *) raiMsg->Packed(),
-                               (tibrv_u32) raiMsg->PackSize() );
+  if ( raiMsg->GetProtocol() == RV_PROTO ) {
+    status = tibrvMsg_CreateFromBytes( &m, (void *) raiMsg->Packed() );
+  }
+  else {
+    status = tibrvMsg_Create( &m );
+    if ( status == TIBRV_OK )
+      status = tibrvMsg_AddOpaque( m, "_data_", (void *) raiMsg->Packed(),
+                                   (tibrv_u32) raiMsg->PackSize() );
+  }
   /*
     An alternative way to do this not using the rvMsg API directly
     RaiMsg msg;
@@ -838,7 +849,7 @@ RaiPublish::Publish(const char * subject, RaiMsg * raiMsg )
   */
   if ( status != TIBRV_OK )
     throw badRvStatus( status );
-  status = tibrvMsg_SetSendSubject( m, ticName );
+  status = tibrvMsg_SetSendSubject( m, subject );
   if ( status != TIBRV_OK )
     throw badRvStatus( status );
   status = tibrvTransport_Send( session->sessionImpl->rvT, m );

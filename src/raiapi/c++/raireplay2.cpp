@@ -168,6 +168,14 @@ struct RaiReplay2 : public RaiTimerCallback {
       this->api->Close();
   }
 
+  static const char * prefix_null_check( const char *value ) {
+    if ( value != NULL &&
+         ( value[ 0 ] == '\0' || ::strcmp( value, "\"\"" ) == 0  ||
+           ::strcmp( value, "-" ) == 0 ) )
+      value = NULL;
+    return value;
+  }
+
   bool init( RaiApi *apip,  rai::Args &args ) {
     this->api = apip;
     try {
@@ -194,7 +202,7 @@ struct RaiReplay2 : public RaiTimerCallback {
       this->api->PrintLog( LMINOR, "Found %u files to replay", this->fileCount);
 
       /* subject prefix */
-      const char *prefix = args.getString( repargs.prefix_arg.name );
+      const char *prefix = prefix_null_check( args.getString( repargs.prefix_arg.name ) );
       if ( prefix == NULL )
         prefix = "";
       ::strncpy( this->subjectBuf, prefix, sizeof( this->subjectBuf ) - 1 );

@@ -140,8 +140,10 @@ void ArgList::help() {
     Sys::out->printf( "   %-20.20s  Example: %s\n\n", "", curr->example );
     curr = curr->next;
   }
+  Sys::out->flush();
 }
 
 void ArgList::version() {
   Sys::out->printf( "%s\n", RaiApi::RaiVersion() );
+  Sys::out->flush();
 }

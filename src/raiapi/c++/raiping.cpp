@@ -15,6 +15,13 @@ using namespace rai;
 using namespace rai_old; /* v1 api */
 
 static const char WARN_FASTPRODUCER[] = "_RV.WARN.SYSTEM.CLIENT.FASTPRODUCER";
+static const char * prefix_null_check( const char *value ) {
+  if ( value != NULL &&
+       ( value[ 0 ] == '\0' || ::strcmp( value, "\"\"" ) == 0  ||
+         ::strcmp( value, "-" ) == 0 ) )
+    value = NULL;
+  return value;
+}
 
 class Ping {
  public:
@@ -34,6 +41,8 @@ class Ping {
                 msgRecvd;
   TimeMSecs     startTime,
                 timer;
+  double        deltaSum,
+                lastDelta;
 
   Ping( const char *pref, const char *subject,  unsigned int msgsPerSec,  ullong msgCount ) {
     this->session       = NULL;
@@ -51,9 +60,11 @@ class Ping {
     this->msgSent       = 0;
     this->startTime     = 0;
     this->timer         = 0;
+    this->deltaSum      = 0;
+    this->lastDelta     = 0;
 
-    if ( pref != NULL && ::strcmp( pref, "\"\"" ) != 0 &&
-         pref[ 0 ] != '\0' ) {
+    pref = prefix_null_check( pref );
+    if ( pref != NULL ) {
       ::strcpy( this->PublishSubject, pref );
       ::strcat( this->PublishSubject, "." );
       ::strcat( this->PublishSubject, subject );
@@ -67,14 +78,26 @@ class Ping {
     Ping * me = (Ping *) closure;
     double cpms;
     ullong sendTime,
-      curTime;
+           curTime = Time::getHiresTime( &cpms );
 
     try {
       if ( raiMsg->Get( "time", sendTime ) ) {
-        curTime = Time::getHiresTime( &cpms );
-        printf( "%s: cnt=%u time=%.03f ms\n",
-                me->subject, (unsigned int) me->msgRecvd++,
-                (double) ( curTime - sendTime ) / (double) cpms );
+        double delta = (double) ( curTime - sendTime ) / (double) cpms;
+        me->deltaSum += delta;
+        me->msgRecvd += 1;
+        if ( me->msgsPerSec <= 10 ) {
+          printf( "%s: cnt=%u time=%.06f us\n",
+                  me->subject, (unsigned int) me->msgRecvd,
+                  (double) ( curTime - sendTime ) / (double) cpms );
+        }
+        else {
+          if ( me->msgRecvd % me->msgsPerSec == 0 ) {
+            printf( "%s: cnt=%u avg time=%.06f us\n",
+                    me->subject, (unsigned int) me->msgRecvd,
+                    ( me->deltaSum - me->lastDelta ) / (double) me->msgsPerSec );
+            me->lastDelta = me->deltaSum;
+          }
+        }
         if ( me->msgRecvd == me->msgCount )
           me->done = true;
         // set finished flag
@@ -82,7 +105,7 @@ class Ping {
     } catch ( Error e ) {
       printf( "Ping_onMsg: %s.%u: %s\n", e->module, e->status, e->reason );
     }
-  };
+  }
 
   void updateClock( void ) {
     TimeMSecs currentTime;
@@ -94,7 +117,7 @@ class Ping {
       this->msgsClocked = (ullong) ( currentTime - this->startTime ) *
         (ullong) this->msgsPerSec / (ullong) 1000;
     }
-  };
+  }
 
   static void  onTimer( RaiSession * /* session */, void * closure ) {
     Ping       * me = (Ping *) closure;
@@ -110,11 +133,8 @@ class Ping {
                         RAIMSG_MEMORY_STATIC );
         time = Time::getHiresTime();
         msg.Append( "time", time );
-
         me->Publisher->Publish( me->PublishSubject, &msg );
-
-        if ( ++me->msgSent == me->msgCount )
-          return;
+        me->msgSent += 1;
       }
     } catch ( Error e ) {
       printf( "Error publishing message: %s.%u: %s\n", e->module, e->status, e->reason );
@@ -193,7 +213,7 @@ main( int argc, char *argv[] )
                        "0 for infinite" );
   Argument prefix(     "prefix", "", "-prefix _TIC.", 
                        "Publish subject prefix, use \"\" for no prefix" );
-  Argument subject(    "subject", "PING.${HOSTNAME}", "-subject RAITEST.a.b.c", 
+  Argument subject(    "subject", "PING.REC.TEST.NaE", "-subject RAITEST.a.b.c",
                        "Publish subject to ping" );
   ArgList args;
   Ping * ping;
