@@ -328,6 +328,10 @@ ifeq (true,$(mingw))
 # The exes and the JNI dlls link the C++ api from the static library, and
 # the sibling libs from lnk_lib, so they are self contained.
 raiapi_dlnk := $(libd)/libraimdapi.a $(lnk_lib)
+# ... so the exe / JNI-dll prerequisites must be the static libs they link,
+# not the dll: otherwise a changed .a never relinks them (and with -j the
+# exe can link before the .a is rebuilt)
+raiapi_dlib := $(libd)/libraimdapi.a $(lnk_dep)
 else
 raiapi_dlnk := -lraimdapi
 endif
