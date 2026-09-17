@@ -2610,7 +2610,8 @@ RaiField::PrintXML( OutputStream *output_file,  Rai_u32 attr_flags,
                        ( field_newlines == 0 ? "" : "\n" ) );
 }
 
-unsigned int RaiField::cvtFloatToStringPrecision;
+unsigned int RaiField::cvtFloatToStringPrecision,
+             RaiField::overrideFloatToStringPrecision;
 
 static bool
 is_mktfeed_blob( const byte *fptr,  RaiMsg_size fsize,  RaiMsg_data dest,
@@ -2643,10 +2644,30 @@ realToStringPrecision( unsigned int hint )
   unsigned int prec;
   if ( RaiField::cvtFloatToStringPrecision == 0 ) {
     const char *p;
-    if ( (p = ::getenv( "RAIMSG_CVT_PRECISION" )) == NULL ||
-         (RaiField::cvtFloatToStringPrecision = (unsigned) atoi( p )) == 0 )
-      RaiField::cvtFloatToStringPrecision = StrUtil::UNTIL_ZERO;
+    RaiField::cvtFloatToStringPrecision = StrUtil::UNTIL_ZERO;
+    RaiField::overrideFloatToStringPrecision = 0;
+    if ( (p = ::getenv( "RAIMSG_CVT_PRECISION" )) != NULL ) {
+      bool dot = false;
+      unsigned int a = 0, b = 0;
+      for ( const char *q = p; *q != '\0'; q++ ) {
+        if ( *q == '.' ) {
+          dot = true;
+        }
+        else if ( *q >= '0' && *q <= '9' ) {
+          if ( dot )
+            b = ( b * 10 ) + ( *q - '0' );
+          else
+            a = ( a * 10 ) + ( *q - '0' );
+        }
+      }
+      if ( a != 0 )
+        RaiField::cvtFloatToStringPrecision = a;
+      if ( b != 0 )
+        RaiField::overrideFloatToStringPrecision = b;
+    }
   }
+  if ( RaiField::overrideFloatToStringPrecision != 0 )
+    return RaiField::overrideFloatToStringPrecision;
   prec = RaiField::cvtFloatToStringPrecision;
   switch ( hint ) {
     case RAI_TSS_HINT_DENOM_2: prec = 1; break;

@@ -58,9 +58,10 @@ struct RAIMSG_DLL_EXP RaiField {
                 iterMsgSize;
   RaiMsg      * iterMsg,
                 tempMsg;
-  static unsigned int cvtFloatToStringPrecision; /* default = 2 or environ var
+  static unsigned int cvtFloatToStringPrecision; /* default = 255 or environ var
                    RAIMSG_CVT_PRECISION;  number of decimal places to print
                    when converting floats to string */
+  static unsigned int overrideFloatToStringPrecision; /* default = 0 */
   void ReUse( void );
 
   void * operator new( size_t /* sz */, void *ptr ) { return ptr; }
