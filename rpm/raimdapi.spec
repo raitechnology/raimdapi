@@ -33,6 +33,10 @@ Prefix:	        /usr
 # chroot (dotnet-sdk-9.0 on EL8/9/10 + Fedora; nothing on EL7), so it is off by
 # default; build --with dotnet to enable.
 %bcond_with dotnet
+# golang: the Go binding (src/raiapi/golang, cgo over libraimdapi) and the
+# g{raisub2,raipub2,raiping2,raireplay2} programs.  Needs the golang package
+# in the chroot; off by default, build --with golang to enable.
+%bcond_with golang
 
 BuildRequires:  gcc-c++
 BuildRequires:  chrpath
@@ -56,6 +60,9 @@ BuildRequires:  java-%{jdk_ver}-openjdk-devel
 %if %{with dotnet}
 BuildRequires:  dotnet-sdk-9.0
 %endif
+%if %{with golang}
+BuildRequires:  golang
+%endif
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
 
@@ -72,7 +79,7 @@ Market data api
 
 %build
 make build_dir=./usr %{?_smp_mflags} \
-     java=%{with java} jdk_release=%{jdk_ver} dotnet=%{with dotnet} \
+     java=%{with java} jdk_release=%{jdk_ver} dotnet=%{with dotnet} golang=%{with golang} \
      dist_bins
 cp -a ./include ./usr/include
 

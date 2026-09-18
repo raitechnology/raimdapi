@@ -27,9 +27,11 @@ java_classd := $(build_dir)/java
 java_srcd   := ./src/raiapi/java
 
 # --- language bindings ------------------------------------------------------
-# java=0 / dotnet=0 disable a binding (rpm spec passes these from %bcond).
+# java=0 / dotnet=0 / golang=0 disable a binding (rpm spec passes these from
+# %bcond).
 java   ?= 1
 dotnet ?= 0
+golang ?= 0
 
 ifeq ($(java),1)
 # Locate the JDK from whichever javac is active (follows alternatives / mock
@@ -588,6 +590,35 @@ $(bind)/d%: $(dotnet_stamp) GNUmakefile
 ifeq ($(dotnet),1)
 all_libs += $(dotnet_stamp)
 all_exes += $(dotnet_progs)
+endif
+
+# --- Go binding (golang=1) ---------------------------------------------------
+# src/raiapi/golang: package raiapi2 (cgo over libraimdapi, include/raiapi2_c.h)
+# and the raisub2/raipub2/raiping2/raireplay2 programs, installed as g<prog>
+# in $(bind) like the java j<prog> / .NET d<prog>.  The binaries are ELF with
+# an rpath to $(libd) (removed by dist_bins, like the C++ programs); the
+# binding version is stamped from the same variables as the C++/java/.NET.
+golang_srcd  := src/raiapi/golang
+golang_mod   := github.com/injinj/raimdapi/src/raiapi/golang
+golang_progs_names := raisub2 raipub2 raiping2 raireplay2
+golang_src   := $(wildcard $(golang_srcd)/go.mod $(golang_srcd)/raiapi2/*.go \
+                           $(golang_srcd)/raiapi2/*.c $(golang_srcd)/cmd/*/*.go)
+golang_progs := $(addprefix $(bind)/g, $(golang_progs_names))
+golang_env   := CGO_ENABLED=1 CGO_CFLAGS="-I$(abspath include)" \
+                CGO_LDFLAGS="-L$(abspath $(libd)) -Wl,-rpath,$(abspath $(libd))"
+# recursive (=): version_str is defined further down
+golang_flags  = -ldflags "-X '$(golang_mod)/raiapi2.bindingVersion=$(version_str)'"
+
+$(bind)/g%: $(golang_src) $(libd)/libraimdapi.$(dll) $(version_h)
+	@mkdir -p $(bind)
+	cd $(golang_srcd) && $(golang_env) go build $(golang_flags) -o $(abspath $@) ./cmd/$*
+
+.PHONY: golang_vet
+golang_vet:
+	cd $(golang_srcd) && $(golang_env) go vet ./...
+
+ifeq ($(golang),1)
+all_exes += $(golang_progs)
 endif
 
 all_dirs := $(bind) $(libd) $(objd) $(dependd) $(java_classd)
