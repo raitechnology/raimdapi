@@ -160,15 +160,17 @@ dlnk_dep    :=
 ifneq (,$(omm_home))
 omm_lib     := $(omm_home)/$(libd)/libomm.a
 omm_dll     := $(omm_home)/$(libd)/libomm.$(dll)
-lnk_lib     += $(omm_lib)
-lnk_dep     += $(omm_lib)
-dlnk_lib    += -L$(omm_home)/$(libd) -lomm
-dlnk_dep    += $(omm_dll)
+ommapi_lib  := $(omm_home)/$(libd)/libommapi.a
+ommapi_dll  := $(omm_home)/$(libd)/libommapi.$(dll)
+lnk_lib     += $(ommapi_lib) $(omm_lib)
+lnk_dep     += $(ommapi_lib) $(omm_lib)
+dlnk_lib    += -L$(omm_home)/$(libd) -lommapi -lomm
+dlnk_dep    += $(ommapi_dll) $(omm_dll)
 rpath5       = ,-rpath,$(pwd)/$(omm_home)/$(libd)
 includes    += -I$(omm_home)/include
 else
-lnk_lib     += $(push_static) -lomm $(pop_static)
-dlnk_lib    += -lomm
+lnk_lib     += $(push_static) -lommapi -lomm $(pop_static)
+dlnk_lib    += -lommapi -lomm
 endif
 
 ifneq (,$(sassrv_home))
@@ -297,7 +299,7 @@ all_depends :=
 # coexist with v2 in one object.  Named raimdapi (not raiapi/raiapi2, which
 # are RaiCore's libraries) to keep the two code bases apart.
 raiapi_files    := raiapi
-raiapi2_files   := raiapi2 raiapi2_tibrv
+raiapi2_files   := raiapi2 raiapi2_tibrv raiapi2_omm
 raiapi2c_files  := raiapi2_c
 base_files      := sys time log file thread mem dir
 stream_files    := io_stream file_stream stdio_stream byte_array_stream cycle_stream

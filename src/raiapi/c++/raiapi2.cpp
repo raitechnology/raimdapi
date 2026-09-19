@@ -24,6 +24,7 @@ using namespace rai;
 
 static RaiEntitlement *entitlements = NULL;
 extern "C" RaiApi *RaiApi_RaiOpen_tibrv( int argc,  char *argv[] );
+extern "C" RaiApi *RaiApi_RaiOpen_omm( int argc,  char *argv[] );
 const char DEFAULT_PROTO[] = "tibrv";
 
 RaiApi *
@@ -40,6 +41,8 @@ RaiApi::RaiOpen( const char *name,  int argc,  char *argv[] )
   /* statically link these */
   if ( ::strcmp( name, "tibrv" ) == 0 )
     return RaiApi_RaiOpen_tibrv( argc, argv );
+  if ( ::strcmp( name, "omm" ) == 0 )
+    return RaiApi_RaiOpen_omm( argc, argv );
   throw RaiApiErr::getErr( RaiApiErr::UNSUPPORTED_TSPT );
 }
 
